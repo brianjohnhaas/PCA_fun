@@ -1,0 +1,81 @@
+---
+title: "Exploring PCA Analysis - and how it works"
+output: html_document
+---
+
+
+```{r}
+expr_matrix_file = "test.matrix" #Trinity_trans.TMM.EXPR.matrix"
+data = read.table(expr_matrix_file)
+log2data = log2(data+1)
+```
+
+Scale the expression data in the columns according to Z-scores and center at zero.
+
+```{r}
+scaled_log2data = scale(log2data, center=T, scale=T)
+```
+
+Now center the expression for each gene
+
+```{r}
+pca_data = t(scale(t(scaled_log2data), center=T, scale=F))
+```
+
+Consider remvoing those genes that have low variance
+
+```{r}
+trans_sd = apply(pca_data, 1, sd)
+hist(trans_sd, br=30)
+```
+
+# Running PCA
+
+## Running PCA using svd
+
+First, transpose the matrix so that the genes (the observations) are the columns and the samples are the rows.
+
+```{r}
+pca_data = t(pca_data)
+```
+
+Now, following how the 'prcomp' works under the hood:
+https://svn.r-project.org/R/trunk/src/library/stats/R/prcomp.R
+
+```{r}
+s = svd(pca_data, nu=0)
+sdev = s$d / sqrt(max(1, nrow(pca_data) - 1))
+rotation = s$v   # eigenvalues or weights or loadings
+pc_scores =  pca_data %*% rotation
+
+head(rotation)
+head(pc_scores)
+plot(pc_scores[,1], pc_scores[,2])
+```
+
+Of course, you could just run the 'prcomp' like so:
+
+```{r}
+pca = prcomp(pca_data)
+rotation = pca$rotation
+pc_scores = pca$x
+
+head(rotation)
+head(pc_scores)
+plot(pc_scores[,1], pc_scores[,2])
+```
+
+## Running PCA using Eigen
+
+Another way to do this the longer way is to use eigen to extract the eigenvalues and eigenvectors from a correlation matrix
+
+```{r}
+trans_cov_matrix = cov(pca_data)
+trans_cov_matrix[1:5,1:5] # just for show
+myEig = eigen(trans_cov_matrix)
+names(myEig)
+#head(myEig$vectors)
+scores = pca_data %*% myEig$vectors
+scores[,1:15]
+plot(scores[,1], scores[,2])
+```
